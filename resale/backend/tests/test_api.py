@@ -43,7 +43,7 @@ def test_listing_unknown_platform():
 def test_listing_ok(monkeypatch):
     monkeypatch.setattr(
         llm, "draft_listing",
-        lambda a, p, n="": Listing(platform=p, title="t", description="d", price=8000, currency="RUB"),
+        lambda a, p, n="", c=None: Listing(platform=p, title="t", description="d", price=8000, currency="RUB"),
     )
     r = client.post("/api/listing?platform=avito", json=FAKE.model_dump())
     assert r.status_code == 200
@@ -71,3 +71,53 @@ def test_reply_never_below_min_price(monkeypatch):
     )
     d = llm.draft_reply(req)
     assert d.suggested_counter_price == 6000 and d.needs_human
+
+
+def test_categories_include_cameras():
+    cats = client.get("/api/categories").json()
+    film = next(c for c in cats if c["key"] == "film_cameras")
+    assert len(film["seller_checklist"]) >= 5
+
+
+def test_appraise_rejects_unknown_category():
+    r = client.post(
+        "/api/appraise",
+        files={"photos": ("a.jpg", b"\xff\xd8", "image/jpeg")},
+        data={"category": "nope"},
+    )
+    assert r.status_code == 400
+
+
+def test_camera_hint_reaches_prompt(monkeypatch):
+    seen = {}
+
+    class R:
+        parsed_output = FAKE
+
+    class M:
+        def parse(self, **k):
+            seen.update(k)
+            return R()
+
+    class C:
+        messages = M()
+
+    monkeypatch.setattr(llm, "client", lambda: C())
+    llm.appraise([(b"x", "image/jpeg")], region="RU", currency="RUB", category="film_cameras")
+    assert "байонет" in seen["system"]
+
+
+def test_eval_score():
+    import csv, io, sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "eval"))
+    from score import score
+
+    rows = list(csv.DictReader(io.StringIO(
+        "id,ai_price_low,ai_price_fair,ai_price_high,sold_price,days_to_sell,ai_model_correct\n"
+        "1,6000,8000,11000,7500,5,yes\n"
+        "2,1000,2000,3000,,,\n"
+    )))
+    s = score(rows)
+    assert s["items_sold"] == 1 and s["sold_inside_ai_range"] == 1.0
+    assert s["mape_fair_vs_sold"] == round(500 / 7500, 3)

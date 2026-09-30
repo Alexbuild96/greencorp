@@ -4,6 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 
 from . import llm
+from .categories import CATEGORIES, DEFAULT_CATEGORY, get_category
 from .config import settings
 from .platforms import PLATFORMS, get_platform
 from .schemas import Appraisal, Listing, ReplyDraft, ReplyRequest
@@ -24,13 +25,26 @@ def platforms():
     return [p.__dict__ for p in PLATFORMS.values()]
 
 
+@app.get("/api/categories")
+def categories():
+    return [
+        {"key": c.key, "name": c.name, "seller_checklist": c.seller_checklist}
+        for c in CATEGORIES.values()
+    ]
+
+
 @app.post("/api/appraise", response_model=Appraisal)
 async def appraise(
     photos: list[UploadFile] = File(...),
     region: str = Form("RU"),
     currency: str = Form(settings.default_currency),
     notes: str = Form(""),
+    category: str = Form(DEFAULT_CATEGORY),
 ):
+    try:
+        get_category(category)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
     if not 1 <= len(photos) <= settings.max_images:
         raise HTTPException(400, f"Нужно от 1 до {settings.max_images} фото")
     images: list[tuple[bytes, str]] = []
@@ -41,16 +55,19 @@ async def appraise(
         if len(data) > settings.max_image_bytes:
             raise HTTPException(413, "Фото больше 5 МБ")
         images.append((data, f.content_type))
-    return llm.appraise(images, region=region, currency=currency, seller_notes=notes)
+    return llm.appraise(
+        images, region=region, currency=currency, seller_notes=notes, category=category
+    )
 
 
 @app.post("/api/listing", response_model=Listing)
-def listing(appraisal: Appraisal, platform: str, notes: str = ""):
+def listing(appraisal: Appraisal, platform: str, notes: str = "", category: str = DEFAULT_CATEGORY):
     try:
         get_platform(platform)
+        get_category(category)
     except ValueError as e:
         raise HTTPException(400, str(e)) from e
-    return llm.draft_listing(appraisal, platform, notes)
+    return llm.draft_listing(appraisal, platform, notes, category)
 
 
 @app.post("/api/reply", response_model=ReplyDraft)

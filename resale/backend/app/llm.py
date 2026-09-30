@@ -3,6 +3,7 @@ import base64
 
 import anthropic
 
+from .categories import get_category
 from .config import settings
 from .platforms import PLATFORMS, get_platform
 from .prompts import APPRAISE_SYSTEM, LISTING_SYSTEM, REPLY_SYSTEM
@@ -35,7 +36,9 @@ def appraise(
     region: str,
     currency: str,
     seller_notes: str = "",
+    category: str | None = None,
 ) -> Appraisal:
+    cat = get_category(category)
     platforms = "\n".join(
         f"- {p.key}: {p.name} ({p.region}, {p.currency})" for p in PLATFORMS.values()
     )
@@ -51,19 +54,22 @@ def appraise(
     response = client().messages.parse(
         model=settings.claude_model,
         max_tokens=16000,
-        system=APPRAISE_SYSTEM,
+        system=f"{APPRAISE_SYSTEM}\n\n{cat.appraise_hint}",
         messages=[{"role": "user", "content": content}],
         output_format=Appraisal,
     )
     return response.parsed_output
 
 
-def draft_listing(appraisal: Appraisal, platform_key: str, seller_notes: str = "") -> Listing:
+def draft_listing(
+    appraisal: Appraisal, platform_key: str, seller_notes: str = "", category: str | None = None
+) -> Listing:
     platform = get_platform(platform_key)
+    cat = get_category(category)
     response = client().messages.parse(
         model=settings.claude_model,
         max_tokens=16000,
-        system=LISTING_SYSTEM,
+        system=f"{LISTING_SYSTEM}\n\n{cat.listing_hint}",
         messages=[{
             "role": "user",
             "content": (
