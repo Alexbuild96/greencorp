@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Resale AI</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main>
+    <h1>Resale AI</h1>
+    <p class="sub">Сфотографируйте вещь — получите оценку и готовое объявление.</p>
+
+    <section id="step-photo">
+      <label class="drop">
+        <input id="photos" type="file" accept="image/*" capture="environment" multiple>
+        <span>Добавить фото (до 6)</span>
+      </label>
+      <div id="previews"></div>
+      <textarea id="notes" placeholder="Что известно о вещи: комплектация, дефекты, год…"></textarea>
+      <div class="row">
+        <select id="region">
+          <option value="RU">Россия (₽)</option>
+          <option value="EU">Европа (€)</option>
+          <option value="US">США ($)</option>
+        </select>
+        <button id="appraise">Оценить</button>
+      </div>
+    </section>
+
+    <section id="step-result" hidden>
+      <h2 id="r-title"></h2>
+      <p id="r-price"></p>
+      <p id="r-meta"></p>
+      <ul id="r-questions"></ul>
+      <ul id="r-warnings" class="warn"></ul>
+      <div class="row">
+        <select id="platform"></select>
+        <button id="make-listing">Создать объявление</button>
+      </div>
+    </section>
+
+    <section id="step-listing" hidden>
+      <input id="l-title">
+      <textarea id="l-desc" rows="8"></textarea>
+      <div class="row">
+        <strong id="l-price"></strong>
+        <button id="copy">Скопировать</button>
+      </div>
+      <p class="hint">Публикуйте вручную на площадке — автопубликация появится позже.</p>
+    </section>
+
+    <p id="status" role="status"></p>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
